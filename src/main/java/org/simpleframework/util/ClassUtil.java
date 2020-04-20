@@ -1,11 +1,13 @@
 package org.simpleframework.util;
 
 
-
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.File;
 import java.io.FileFilter;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
 import java.net.URL;
 import java.util.HashSet;
 import java.util.Set;
@@ -14,45 +16,47 @@ import java.util.Set;
 public class ClassUtil {
     /**
      * 根据包名获取类的集合
+     *
      * @param packageName
      * @return
      */
-    public static Set<Class<?>> extractPackageClass(String packageName){
+    public static Set<Class<?>> extractPackageClass(String packageName) {
 //1.获取类加载器；2.通过类加载器获取到加载的资源信息；3.依据不同资源类型，采用不同方式获取资源的集合
-        ClassLoader classLoader=getClassLoader();
-        URL url=  classLoader.getResource(packageName.replace(".","/"));
-        if(url==null){
+        ClassLoader classLoader = getClassLoader();
+        URL url = classLoader.getResource(packageName.replace(".", "/"));
+        if (url == null) {
             return null;
         }
-        Set<Class<?>> classSet=null;
-        if(url.getProtocol().equalsIgnoreCase("file")){
-            classSet=new HashSet<Class<?>>();
-            File packageDirectory=new File(url.getPath());
-            extractClassFile(classSet,packageDirectory,packageName);
+        Set<Class<?>> classSet = null;
+        if (url.getProtocol().equalsIgnoreCase("file")) {
+            classSet = new HashSet<Class<?>>();
+            File packageDirectory = new File(url.getPath());
+            extractClassFile(classSet, packageDirectory, packageName);
         }
         return classSet;
     }
 
     /**
      * 递归获取目标package里面所有的class文件（包括package文件夹里面的文件）
+     *
      * @param emptyClassSet
      * @param fileSource
      * @param packageName
      */
     private static void extractClassFile(Set<Class<?>> emptyClassSet, File fileSource, String packageName) {
-        if(!fileSource.isDirectory()){
+        if (!fileSource.isDirectory()) {
             return;
         }
         //如果是文件夹，则列出其中所有的文件
-        File[] files=fileSource.listFiles(new FileFilter() {
+        File[] files = fileSource.listFiles(new FileFilter() {
             @Override
             public boolean accept(File file) {
-                if(file.isDirectory()){
+                if (file.isDirectory()) {
                     return true;
-                }else{
+                } else {
                     //获取文件的绝对值路径
-                    String absoluteFilePath=file.getAbsolutePath();
-                    if(absoluteFilePath.endsWith(".class")){
+                    String absoluteFilePath = file.getAbsolutePath();
+                    if (absoluteFilePath.endsWith(".class")) {
                         //如果是clss文件直接加载
                         addToClassSet(absoluteFilePath);
                     }
@@ -62,24 +66,29 @@ public class ClassUtil {
 
             private void addToClassSet(String absoluteFilePath) {
                 //获取类的全路径
-                absoluteFilePath.replace(File.separator,".");
-                String className=absoluteFilePath.substring(absoluteFilePath.indexOf(packageName));
-                className=className.substring(0,className.lastIndexOf("."));
+                absoluteFilePath.replace(File.separator, ".");
+                String className = absoluteFilePath.substring(absoluteFilePath.indexOf(packageName));
+                className = className.substring(0, className.lastIndexOf("."));
                 //通过反射获取类
                 emptyClassSet.add(loadClass(className));
             }
         });
-        if(files!=null){
-            for (File file:files
-                 ) {
-                extractClassFile(emptyClassSet,file,packageName);
+        if (files != null) {
+            for (File file : files
+            ) {
+                extractClassFile(emptyClassSet, file, packageName);
             }
 
         }
 
     }
 
-    public static Class<?> loadClass(String className){
+    /**
+     * 通过反射获取class对象
+     * @param className
+     * @return
+     */
+    public static Class<?> loadClass(String className) {
         try {
             return Class.forName(className);
         } catch (ClassNotFoundException e) {
@@ -88,7 +97,34 @@ public class ClassUtil {
         }
     }
 
-    public static ClassLoader getClassLoader(){
-       return Thread.currentThread().getContextClassLoader();
+    /**
+     *
+     * @param clazz
+     * @param accessible 是否支持创建出私有类型的构造器
+     * @param <T>
+     * @return
+     */
+    public static <T> T newInstance(Class<T> clazz,boolean accessible) {
+        try {
+            Constructor constructor= clazz.getDeclaredConstructor();
+            constructor.setAccessible(accessible);
+            return (T)constructor.newInstance();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static ClassLoader getClassLoader() {
+        return Thread.currentThread().getContextClassLoader();
+    }
+
+    public static void setField(Field field,Object target,Object value,boolean accessible){
+        field.setAccessible(accessible);
+        try {
+            field.set(target,value);
+        } catch (IllegalAccessException e) {
+            e.printStackTrace();
+            throw new RuntimeException(e);
+        }
     }
 }
