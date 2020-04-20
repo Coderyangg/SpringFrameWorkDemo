@@ -7,6 +7,9 @@ import org.simpleframework.util.CollectionUtils;
 import java.lang.reflect.Field;
 import java.util.Set;
 
+/**
+ * 依赖注入类，注入成员变量的实例
+ */
 public class DependencyInjector {
     /**
      * Bean容器
